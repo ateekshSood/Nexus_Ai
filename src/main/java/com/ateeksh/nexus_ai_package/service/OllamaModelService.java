@@ -11,10 +11,29 @@ import java.util.ArrayList;
 
 @Service
 public class OllamaModelService{
-    @Value("${langchain4j.ollama.chat-model.base-url:=}")
+    @Value("${langchain4j.ollama.chat-model.base-url:http://localhost:11434}")
     private String ollamaBaseUrl;
 
     private final RestTemplate restTemplate = new RestTemplate();
+
+    public String pullModel(String modelName){
+        try{
+            String url = ollamaBaseUrl + "/api/pull";
+
+            Map<String , Object> requestBody = Map.of(
+                "name" , modelName, 
+                "stream" , false
+            );
+
+            restTemplate.postForEntity(url, requestBody, String.class);
+            return "Successfuly downloaded" + modelName;
+        }
+
+        catch(Exception e){
+            System.err.println("error has occured with pulling models" + e.getMessage());
+            return "Failed to downlaod model";
+        }
+    }
 
     public List<String> getInstallModels(){
         try{
