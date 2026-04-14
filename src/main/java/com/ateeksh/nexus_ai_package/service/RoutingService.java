@@ -67,7 +67,7 @@ public class RoutingService {
 
         List<String> model_list = ollamaModelService.getInstallModels();
 
-        if(model_list.isEmpty() || model_list == null){
+        if(model_list == null || model_list.isEmpty()  ){
             return "No models found";
         }
 
