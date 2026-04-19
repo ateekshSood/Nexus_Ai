@@ -1,5 +1,6 @@
 package com.ateeksh.nexus_ai_package.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import oshi.SystemInfo;
 import oshi.hardware.CentralProcessor;
@@ -7,11 +8,12 @@ import oshi.hardware.GlobalMemory;
 import oshi.hardware.HardwareAbstractionLayer;
 import oshi.software.os.OperatingSystem;
 
+@Slf4j
 @Service
 public class HardwareService {
 
-    public final SystemInfo si = new SystemInfo();
-    public final HardwareAbstractionLayer hal = si.getHardware();
+    private final SystemInfo si = new SystemInfo();
+    private final HardwareAbstractionLayer hal = si.getHardware();
 
     public String get_system_info(){
 
