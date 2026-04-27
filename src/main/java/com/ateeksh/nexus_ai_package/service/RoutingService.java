@@ -1,62 +1,37 @@
 package com.ateeksh.nexus_ai_package.service;
 
 import org.springframework.stereotype.Service;
-import java.util.List;
 import java.util.ArrayList;
+import lombok.extern.slf4j.Slf4j;
+import lombok.AllArgsConstructor;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
+import com.ateeksh.nexus_ai_package.config.nexus_properties;
+
+@Slf4j
+@AllArgsConstructor
 @Service
 public class RoutingService {
 
     private final HardwareService hardwareService;
     private final OllamaModelService ollamaModelService;
     private final PromptAnalyzerService prompmAnalyzerService;
-
-    
-    RoutingService(HardwareService hardwareService , OllamaModelService ollamaModelService,
-        PromptAnalyzerService promptAnalyzerService){
-
-            this.hardwareService = hardwareService;
-            this.ollamaModelService = ollamaModelService;
-            this.prompmAnalyzerService = promptAnalyzerService;
-
-    }
+    private final nexus_properties nexusProperites;
 
 
     public List<String> getRecommendedModels(double ram){
 
-        List <String> options = new ArrayList<>();
+        List <nexus_properties.ModelEntry> allModels = new ArrayList<>();
+        allModels.addAll(nexusProperites.getModels().getCode());
+        allModels.addAll(nexusProperites.getModels().getGeneral());
 
-        if (ram >= 16.0){
-            options.add("llama3:8b");
-            options.add("codellama:13b");
-            options.add("mixtral:8x7b");
-        } 
-
-        else if (ram >= 12.0){
-            options.add("llama3.2:3b");
-            options.add("qwen2.5-coder:7b");
-        } 
-
-        else if (ram >= 8.0){
-            options.add("llama3.2:3b");
-            options.add("phi3:mini");
-        } 
-
-        else if (ram >= 4.0){
-            options.add("llama3.2:1b");
-            options.add("qwen2.5-coder:1.5b");
-        } 
-
-        else if (ram >= 2.0){
-            options.add("qwen2.5:0.5b");
-            options.add("tinyllama:1.1b");
-        } 
-
-        else{
-            options.add("qwen2.5:0.5b"); 
-        }
-
-        return options;
+        return allModels.stream()
+        .filter(m -> ram > m.getMinRamGb())
+        .map(nexus_properties.ModelEntry::getName)
+        .distinct()
+        .collect(Collectors.toList());
 
     }
 
@@ -64,51 +39,30 @@ public class RoutingService {
 
         String prompt_type = prompmAnalyzerService.analyzePrompt(prompt);
         double ramgb = hardwareService.getAvailableRam();
+        List<String> installed_models = ollamaModelService.getInstalledModels();
 
-        List<String> model_list = ollamaModelService.getInstallModels();
+        log.info("Routing prompt ki type : {} , The available ram in system is : {} GB and The installed models are : {}",
+            prompt_type , ramgb , installed_models
+        );
 
-        if(model_list == null || model_list.isEmpty()  ){
+        if(installed_models == null || installed_models.isEmpty()  ){
+            log.warn("no installed models are found in ollama");
             return "No models found";
         }
 
-        if("CODE".equals(prompt_type)){
-            if(ramgb >= 16.0 && model_list.contains("codellama:13b")){
-                return "codellama:13b";
-            }
-            else if(ramgb >= 12.0 && model_list.contains("qwen2.5-coder:7b")){
-                return "qwen2.5-coder:7b";
-            }
-            else if(ramgb >= 4.0 && model_list.contains("qwen2.5-coder:1.5b")){
-                return "qwen2.5-coder:1.5b";
-            }
-            else if(model_list.contains("qwen2.5:0.5b")){
-                return "qwen2.5:0.5b";
+        List<nexus_properties.ModelEntry> candidates = "CODE".equals(prompt_type)
+        ? nexusProperites.getModels().getCode()
+        : nexusProperites.getModels().getGeneral();
+
+        for(nexus_properties.ModelEntry model : candidates){
+            if (ramgb > model.getMinRamGb() && installed_models.contains(model.getName())){
+                log.info("Selected model : {} " , model);
+                return model.getName();
             }
         }
 
-        else {
-            if(ramgb >= 16.0 && model_list.contains("mixtral:8x7b")){
-                return "mixtral:8x7b";
-            }
-            else if(ramgb >= 12.0 && model_list.contains("llama3:8b")){
-                return "llama3:8b";
-            }
-            else if(ramgb >= 8.0 && model_list.contains("llama3.2:3b")){
-                return "llama3.2:3b";
-            }
-            else if(ramgb >= 4.0 && model_list.contains("llama3.2:1b")){
-                return "llama3.2:1b";
-            }
-            else if(ramgb >= 2.0 && model_list.contains("tinyllama:1.1b")){
-                return "tinyllama:1.1b";
-            }
-            else if(model_list.contains("qwen2.5:0.5b")){
-                return "qwen2.5:0.5b";
-            }
-        }
-
-
-        return model_list.get(0);
+        log.warn("no ideal model found so fall back to the first installed model : {} " , installed_models.get(0));
+        return installed_models.get(0);
 
 
 
