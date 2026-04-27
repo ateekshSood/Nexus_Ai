@@ -46,7 +46,7 @@ public class OllamaModelService{
         }
     }
 
-    public List<String> getInstallModels(){
+    public List<String> getInstalledModels(){
         try{
             String url = ollamaBaseUrl + "/api/tags";
             ResponseEntity<Map<String , Object>> response = restTemplate.exchange(
