@@ -1,6 +1,9 @@
 package com.ateeksh.nexus_ai_package.service;
 
 import org.springframework.stereotype.Service;
+
+import com.ateeksh.nexus_ai_package.repository.ChatSessionRepository;
+
 import org.springframework.beans.factory.annotation.Value;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.service.AiServices;
@@ -22,8 +25,10 @@ public class AiTalk {
     @Value("${langchain4j.ollama.chat-model.base-url:http://localhost:11434}")
     private String ollamaBaseurl;
 
-    private RoutingService routingService;
-    private HardwareService hardwareService;
+    private final RoutingService routingService;
+    private final HardwareService hardwareService;
+    private final PersistentChatMemoryStore chatMemoryStore;
+    private final ChatSessionRepository chatSessionRepository;
     
     // model cache
 
@@ -37,7 +42,7 @@ public class AiTalk {
         String chat(String message);
     }
 
-    public String getAiResponse(String prompt){
+    public String getAiResponse(String prompt , String chatId){
 
         try{
 
@@ -50,7 +55,7 @@ public class AiTalk {
 
             }
 
-            log.info("best model : {} " , bestModel);
+            log.info("Using model : {} for session : {} " , bestModel , chatId);
 
             ChatLanguageModel model = modelCache.computeIfAbsent(bestModel, name -> 
                 OllamaChatModel.builder()
@@ -59,6 +64,12 @@ public class AiTalk {
                     .timeout(Duration.ofMinutes(2))
                     .build()
             );
+
+            MessageWindowChatMemory memory = MessageWindowChatMemory.builder()
+                .maxMessages(20)
+                .id(chatId)
+                .chatMemoryStore(chatMemoryStore)
+                .build();
 
             Assistant assistant = AiServices.builder(Assistant.class)
                 .chatLanguageModel(model)
