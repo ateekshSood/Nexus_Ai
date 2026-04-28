@@ -6,6 +6,7 @@ import com.ateeksh.nexus_ai_package.repository.ChatSessionRepository;
 import com.ateeksh.nexus_ai_package.service.AiTalk;
 import org.springframework.web.bind.annotation.*;
 import lombok.RequiredArgsConstructor;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -16,7 +17,7 @@ public class ChatController{
     private final ChatSessionRepository chatSessionRepository; 
 
     @PostMapping("/chat")
-    public String chat(@RequestBody ChatRequest request){
+    public Map<String, String> chat(@RequestBody ChatRequest request){
         
         String chatId = request.getChatId();
 
@@ -30,7 +31,8 @@ public class ChatController{
             chatId = newSession.getId(); 
         }
 
-        return aitalk.getAiResponse(request.getMessage() , chatId);
+        String aiResponse = aitalk.getAiResponse(request.getMessage() , chatId);
+        return Map.of("chatId", chatId, "text", aiResponse);
 
     }
     

@@ -14,11 +14,11 @@ import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import java.time.Duration;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
-@AllArgsConstructor
+@RequiredArgsConstructor
 @Service
 public class AiTalk {
 
@@ -73,7 +73,7 @@ public class AiTalk {
 
             Assistant assistant = AiServices.builder(Assistant.class)
                 .chatLanguageModel(model)
-                .chatMemory(chatMemory)
+                .chatMemory(memory)
                 .build();
 
             return assistant.chat(prompt);

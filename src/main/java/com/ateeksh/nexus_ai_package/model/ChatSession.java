@@ -18,11 +18,11 @@ public class ChatSession{
 
     private String title;
 
-    private LocalDateTime createAt;
+    private LocalDateTime createdAt;
 
     @PrePersist
     public void prePersist(){
-        this.createAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now();
     }
 
 
