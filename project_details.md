@@ -1,0 +1,206 @@
+# Nexus AI - Complete Project Details
+
+Nexus AI is a full-stack, stateful, and intelligent chat application. It integrates a React frontend with a highly dynamic Spring Boot backend that features an autonomous AI routing engine. This engine dynamically selects the most appropriate local Large Language Model (LLM) based on the user's prompt classification and the system's real-time hardware constraints (available RAM).
+
+---
+
+## 1. System Architecture
+
+The architecture is designed to be fully local, private, and highly scalable.
+
+```mermaid
+graph TD
+    %% Define Styles
+    classDef frontend fill:#61DAFB,stroke:#333,stroke-width:2px,color:#000;
+    classDef backend fill:#6DB33F,stroke:#333,stroke-width:2px,color:#fff;
+    classDef db fill:#336791,stroke:#333,stroke-width:2px,color:#fff;
+    classDef ai fill:#FF5722,stroke:#333,stroke-width:2px,color:#fff;
+    classDef service fill:#ECECFF,stroke:#333,stroke-width:1px,color:#000;
+
+    subgraph "Frontend Layer (React + Vite)"
+        UI[User Interface]:::frontend
+        State[React State & Hooks]:::frontend
+        Axios[Axios HTTP Client]:::frontend
+        
+        UI --> State
+        State --> Axios
+    end
+
+    subgraph "Backend Layer (Spring Boot)"
+        API[REST Controllers]:::backend
+        
+        subgraph "AI Routing Engine"
+            PAS[PromptAnalyzerService<br/>Embedding & Cosine Similarity]:::service
+            HS[HardwareService<br/>System RAM Check]:::service
+            OMS[OllamaModelService<br/>Check Installed Models]:::service
+            RS[RoutingService<br/>Model Selection Logic]:::service
+            
+            PAS --> RS
+            HS --> RS
+            OMS --> RS
+        end
+        
+        subgraph "LangChain4j Integration"
+            AiTalk[AiTalk Service]:::service
+            MemoryStore[PersistentChatMemoryStore]:::service
+            
+            RS --> AiTalk
+            MemoryStore --> AiTalk
+        end
+        
+        JPA[Spring Data JPA Repositories]:::backend
+        
+        API --> PAS
+        API --> AiTalk
+        AiTalk --> JPA
+    end
+
+    subgraph "Persistence Layer"
+        PG[(PostgreSQL Database<br/>chat_sessions & chat_messages)]:::db
+    end
+
+    subgraph "Local AI Layer"
+        Ollama((Ollama Server<br/>Local LLMs)):::ai
+    end
+
+    %% Connections
+    Axios -->|HTTP POST / GET| API
+    JPA <-->|Hibernate / SQL| PG
+    AiTalk <-->|REST| Ollama
+    OMS <-->|HTTP GET /api/tags| Ollama
+```
+
+---
+
+## 2. Process Flow: Chat Request Lifecycle
+
+This flow demonstrates the intelligent routing and memory persistence that occurs the moment a user sends a message.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as React Frontend
+    participant C as ChatController
+    participant PA as PromptAnalyzerService
+    participant R as RoutingService
+    participant H as HardwareService
+    participant A as AiTalk (LangChain4j)
+    participant M as PersistentChatMemoryStore
+    participant DB as PostgreSQL
+    participant O as Ollama Server
+
+    U->>F: Types message & Clicks Send
+    F->>C: POST /api/ai/chat {message, chatId}
+    
+    C->>PA: analyzePrompt(message)
+    Note over PA: Embeds text using AllMiniLmL6V2<br/>Compares Cosine Similarity to Anchors
+    PA-->>C: Returns "CODE" or "GENERAL"
+    
+    C->>R: routePrompt(category)
+    R->>H: getAvailableRam()
+    H-->>R: Returns free RAM (e.g., 2.2GB)
+    R->>O: Get installed models
+    O-->>R: Returns list of pulled models
+    Note over R: Filters application.yml models by:<br/>1. Category (CODE/GENERAL)<br/>2. Installed locally<br/>3. Min RAM <= Available RAM
+    R-->>C: Selected Model (e.g., qwen2.5:0.5b)
+
+    C->>A: getAiResponse(message, chatId, model)
+    A->>M: getMessages(chatId)
+    M->>DB: SELECT * FROM chat_messages
+    DB-->>M: Previous Context
+    M-->>A: List<ChatMessage>
+    
+    A->>O: Send Prompt + Context via ChatLanguageModel
+    O-->>A: AI Response
+    
+    A->>M: saveMessage(User Message)
+    A->>M: saveMessage(AI Response)
+    M->>DB: INSERT INTO chat_messages
+    
+    A-->>C: AI Text Response
+    C-->>F: JSON {text, chatId}
+    F-->>U: Updates UI & Auto-scrolls
+```
+
+---
+
+## 3. Frontend Details
+
+**Tech Stack:** React 19, Vite, Material-UI (MUI), Axios, ReactMarkdown.
+
+### Core Features
+- **Dynamic Layout:** Uses MUI `Grid` to split the screen into a 3-column sidebar (chat history) and a 9-column main chat interface.
+- **State Management:** Fully functional components using React hooks (`useState` for storing messages and sessions, `useEffect` for data fetching on load).
+- **Auto-Scrolling:** Implements `useRef` pointing to an invisible `<div>` at the bottom of the chat. A `useEffect` triggers `.scrollIntoView({behavior: "smooth"})` every time the messages array updates.
+- **Markdown Rendering:** AI responses are processed through `<ReactMarkdown>`, allowing proper rendering of bold text, headers, and code blocks generated by the LLM.
+- **API Communication:** Uses `axios` to seamlessly communicate with the Spring Boot backend via JSON payloads.
+
+---
+
+## 4. Backend Details
+
+**Tech Stack:** Java 25, Spring Boot 4.0, LangChain4j, PostgreSQL, Hibernate/JPA.
+
+### Core Modules
+
+1. **PromptAnalyzerService (Semantic Classification)**
+   - Initializes a local in-memory embedding model (`AllMiniLmL6V2EmbeddingModel`).
+   - Pre-computes anchor embeddings for `CODE` topics and `GENERAL` topics on startup.
+   - When a prompt arrives, it converts the text into a vector embedding and calculates the **Cosine Similarity** against the anchors to classify the user's intent.
+
+2. **RoutingService (Dynamic Fallback)**
+   - Reads configured models from `application.yml` (`nexus.models.code` and `nexus.models.general`).
+   - Uses `OperatingSystemMXBean` to check real-time available system RAM.
+   - Checks the local Ollama instance for installed models.
+   - Filters the configuration list to find the smartest (highest RAM requirement) model that fits into the current free memory and matches the prompt's semantic category.
+
+3. **AiTalk & PersistentChatMemoryStore (Context Management)**
+   - Integrates with LangChain4j `AiServices`.
+   - Uses a custom implementation of `ChatMemoryStore` to intercept LangChain4j's memory system.
+   - Automatically saves and retrieves `SystemMessage`, `UserMessage`, and `AiMessage` to/from PostgreSQL, ensuring the LLM remembers previous turns in the conversation.
+
+### API Routes
+
+| HTTP Method | Endpoint | Description | Payload / Params |
+|-------------|----------|-------------|------------------|
+| **POST** | `/api/ai/chat` | Send a user message to the AI and get a response. | JSON: `{ "message": "string", "chatId": "uuid-string (optional)" }` |
+| **GET** | `/api/chats` | Retrieve all historical chat sessions for the sidebar. | None |
+| **GET** | `/api/chats/{sessionId}/messages`| Retrieve the full message history for a specific chat. | Path Variable: `sessionId` |
+
+---
+
+## 5. Database Schema (PostgreSQL)
+
+The persistence layer relies on two main tables managed automatically by Hibernate (`ddl-auto: update`):
+
+**`chat_sessions`**
+- `id` (VARCHAR 255) - Primary Key (UUID)
+- `title` (VARCHAR 255) - Generated summary of the chat
+- `created_at` (TIMESTAMP) - Timestamp of creation
+
+**`chat_messages`**
+- `id` (VARCHAR 255) - Primary Key (UUID)
+- `session_id` (VARCHAR 255) - Foreign Key to `chat_sessions`
+- `sender` (VARCHAR 255) - 'USER' or 'AI'
+- `text` (TEXT) - The actual content of the message
+- `timestamp` (TIMESTAMP) - Time the message was sent
+
+---
+
+## 6. Configuration Example (`application.yml`)
+The engine is configured via custom properties that define the RAM boundaries for the routing engine:
+
+```yaml
+nexus:
+  models:
+    code:
+      - name: codellama:13b
+        min-ram-gb: 16.0
+      - name: qwen2.5-coder:1.5b
+        min-ram-gb: 4.0
+    general:
+      - name: mixtral:8x7b
+        min-ram-gb: 16.0
+      - name: llama3.2:1b
+        min-ram-gb: 4.0
+```
