@@ -1,0 +1,16 @@
+# Routing catalog. Order does not matter: the router tries the largest
+# min_ram_gb first.
+code:
+  - {name: "codellama:13b", min_ram_gb: 16.0}
+  - {name: "qwen2.5-coder:7b", min_ram_gb: 12.0}
+  - {name: "qwen2.5-coder:1.5b", min_ram_gb: 1.9}
+  - {name: "qwen2.5:0.5b", min_ram_gb: 0.0}
+general:
+  - {name: "mixtral:8x7b", min_ram_gb: 16.0}
+  - {name: "llama3:8b", min_ram_gb: 12.0}
+  - {name: "llama3.2:3b", min_ram_gb: 8.0}
+  - {name: "llama3.2:1b", min_ram_gb: 4.0}
+  - {name: "qwen2.5:3b", min_ram_gb: 2.5}
+  - {name: "tinyllama:1.1b", min_ram_gb: 2.0}
+  - {name: "qwen2.5:1.5b", min_ram_gb: 1.5}
+  - {name: "qwen2.5:0.5b", min_ram_gb: 0.0}
